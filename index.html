@@ -102,7 +102,8 @@ window.addEventListener("unhandledrejection", e =>
 const CONFIG = {
   CID: "21087",                                            // 你的 CID
   SOURCE_URL: "https://kkdaypartners.github.io/KKpartners/", // 資料來源頁
-  SHOW_PARTNER_CODES: false  // false＝不顯示「夥伴專屬」折扣碼（公開網站請維持 false）
+  SHOW_PARTNER_CODES: false, // false＝不顯示「夥伴專屬」折扣碼（公開網站請維持 false）
+  HIDE_CARD_CODES: true      // true＝不顯示「信用卡與支付」類折扣碼（信用卡、街口、AFTEE 等）
 };
 
 /* ───────── 小工具 ───────── */
@@ -159,15 +160,23 @@ function loadSource() {
     await waitFor(() => doc.getElementById("ck") && doc.getElementById("ckgo") && doc.getElementById("ckres"), 15000);
 
     // 取得「夥伴專屬」折扣碼清單，之後從結果中移除
-    let aff = new Set();
-    try {
-      win.eval("GROUPS").filter(g => g.id === "aff")
-        .forEach(g => g.items.forEach(i => i.code && aff.add(i.code)));
-    } catch (e) { aff = null; }
-    if (!CONFIG.SHOW_PARTNER_CODES && (!aff || aff.size === 0)) {
+    // 要隱藏的折扣碼：夥伴專屬（對外不公開）＋信用卡與支付類（依設定）
+    const hidden = new Set();
+    const collect = id => {
+      let n = 0;
+      try {
+        win.eval("GROUPS").filter(g => g.id === id)
+          .forEach(g => g.items.forEach(i => { if (i.code) { hidden.add(i.code); n++; } }));
+      } catch (e) {}
+      return n;
+    };
+    if (!CONFIG.SHOW_PARTNER_CODES && collect("aff") === 0) {
       throw new Error("無法確認夥伴專屬碼清單，為避免外流，已停止顯示結果（原頁面可能改版）");
     }
-    return { win, doc, aff: aff || new Set() };
+    if (CONFIG.HIDE_CARD_CODES && collect("card") === 0) {
+      throw new Error("無法確認信用卡折扣碼清單，已停止顯示結果（原頁面可能改版）");
+    }
+    return { win, doc, aff: hidden };
   })().catch(err => {            // 失敗時清掉，下次查詢可重試
     sourcePromise = null;
     if (sourceFrame) { sourceFrame.remove(); sourceFrame = null; }
@@ -217,7 +226,7 @@ async function runQuery(id) {
         const code = (r.querySelector("code") || {}).textContent;
         if (!code) return;
         const c = code.trim();
-        if (!CONFIG.SHOW_PARTNER_CODES && aff.has(c)) return;
+        if (aff.has(c)) return;
         const sp = r.querySelector("span");
         let desc = "", till = "";
         if (sp) {

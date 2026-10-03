@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KKday 折扣碼查詢</title>
+<meta name="description" content="貼上 KKday 商品網址，立刻查出這個商品能用哪些折扣碼。">
+<style>
+  :root{
+    --bg:#f1f4f7; --card:#fff; --ink:#16212b; --sub:#6b7885; --line:#e3e8ed;
+    --brand:#22b8c4; --brand-ink:#0c6f78; --ok:#1f9d63; --ok-bg:#e8f7ef;
+    --warn:#b7791f; --warn-bg:#fdf3dc; --bad:#c0392b; --bad-bg:#fbeae8; --chip:#eef2f5;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#10171d; --card:#18222b; --ink:#e9eef2; --sub:#92a0ac; --line:#26333e;
+      --brand:#35c9d5; --brand-ink:#7fe0e8; --ok:#4cc88c; --ok-bg:#15332a;
+      --warn:#e0b04f; --warn-bg:#352c14; --bad:#ec7c70; --bad-bg:#3a1f1c; --chip:#212d37;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 system-ui,-apple-system,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+  .wrap{max-width:760px;margin:0 auto;padding:40px 16px 56px}
+  h1{margin:0 0 6px;font-size:28px;text-align:center;letter-spacing:.02em}
+  .lede{margin:0 0 24px;text-align:center;color:var(--sub);font-size:15px}
+  .card{background:var(--card);border:2px solid var(--brand);border-radius:20px;padding:20px}
+  .row{display:flex;gap:10px}
+  input[type=search]{flex:1;min-width:0;font:inherit;padding:12px 14px;border:1px solid var(--line);
+    border-radius:12px;background:var(--bg);color:var(--ink)}
+  input[type=search]:focus{outline:2px solid var(--brand);outline-offset:1px}
+  button{font:inherit;cursor:pointer}
+  .go{border:0;border-radius:12px;padding:0 22px;background:var(--brand);color:#04282c;font-weight:700}
+  .go:disabled{opacity:.55;cursor:wait}
+  .hint{margin:10px 2px 0;font-size:13px;color:var(--sub)}
+  .status{margin:4px 2px 0;font-size:12px;color:var(--sub)}
+  .note{margin:-4px 0 14px;padding:10px 14px;border-radius:12px;background:var(--chip);color:var(--sub);font-size:13px;line-height:1.7}
+  #out{margin-top:18px}
+  .info{margin:0 0 12px;font-size:14px;color:var(--sub)}
+  .info b{color:var(--ink)}
+  .cta{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;
+    border-radius:12px;padding:11px 18px;font-weight:700;border:0;background:var(--brand);color:#04282c}
+  .notice{border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:14px}
+  .notice b{display:block}
+  .notice.bad{background:var(--bad-bg);color:var(--bad)}
+  .notice.warn{background:var(--warn-bg);color:var(--warn)}
+  details.grp{border:1px solid var(--line);border-radius:14px;margin:0 0 12px;overflow:hidden}
+  details.grp>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:700;display:flex;align-items:center;gap:8px}
+  details.grp>summary::-webkit-details-marker{display:none}
+  details.grp>summary::after{content:"＋";margin-left:auto;color:var(--sub);font-weight:400}
+  details.grp[open]>summary::after{content:"－"}
+  .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .yes .dot{background:var(--ok)} .unk .dot{background:var(--warn)} .no .dot{background:var(--bad)}
+  .yes>summary{background:var(--ok-bg)} .unk>summary{background:var(--warn-bg)}
+  .code-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+  .code-row code{font:700 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--chip);
+    padding:3px 8px;border-radius:8px;flex:none}
+  .code-row .d{flex:1;min-width:0;font-size:14px}
+  .code-row .d em{display:block;font-style:normal;color:var(--sub);font-size:12px}
+  .copy{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:5px 12px;font-size:13px}
+  .copy.done{background:var(--ok);border-color:var(--ok);color:#fff}
+  .empty,.err{padding:14px;border-radius:12px;font-size:14px}
+  .empty{background:var(--chip);color:var(--sub)}
+  .err{background:var(--bad-bg);color:var(--bad)}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;
+    border-radius:50%;animation:r .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes r{to{transform:rotate(360deg)}}
+  footer{margin-top:22px;font-size:12px;color:var(--sub);text-align:center;line-height:1.7}
+  @media (max-width:520px){.row{flex-direction:column}.go{padding:12px}.code-row{flex-wrap:wrap}.code-row .d{flex-basis:100%;order:3}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>KKday 折扣碼查詢</h1>
+  <p class="lede">貼上商品網址，看這個商品能用哪些折扣碼。</p>
+
+  <div class="card">
+    <form class="row" id="f" autocomplete="off">
+      <input type="search" id="q" placeholder="貼上 KKday 商品網址，或輸入商品編號，例如 19252" aria-label="KKday 商品網址或編號" required>
+      <button class="go" id="go" type="submit">查詢</button>
+    </form>
+    <p class="hint">例：https://www.kkday.com/zh-tw/product/19252</p>
+    <p class="status" id="status">資料準備中…　（如果這行一直沒變成「✓ 資料已就緒」，代表目前的開啟方式無法執行程式，請改用瀏覽器直接開啟網址）</p>
+    <noscript><p class="status" style="color:#c0392b">瀏覽器已停用 JavaScript，無法查詢。</p></noscript>
+    <div id="out" aria-live="polite"></div>
+  </div>
+
+</div>
+
+<script>
+/* ───────── 狀態列：任何錯誤都顯示出來，不會無聲無息 ───────── */
+function setStatus(text, bad) {
+  const el = document.getElementById("status");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = bad ? "var(--bad)" : "var(--sub)";
+}
+window.addEventListener("error", e => setStatus("⚠ 程式錯誤：" + e.message, true));
+window.addEventListener("unhandledrejection", e =>
+  setStatus("⚠ 程式錯誤：" + ((e.reason && e.reason.message) || e.reason), true));
+
+/* ───────── 設定 ───────── */
+const CONFIG = {
+  CID: "21087",                                            // 你的 CID
+  SOURCE_URL: "https://kkdaypartners.github.io/KKpartners/", // 資料來源頁
+  SHOW_PARTNER_CODES: false  // false＝不顯示「夥伴專屬」折扣碼（公開網站請維持 false）
+};
+
+/* ───────── 小工具 ───────── */
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function waitFor(fn, timeout = 5000, step = 50) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeout) {
+    try { if (fn()) return true; } catch (e) {}
+    await sleep(step);
+  }
+  throw new Error("timeout");
+}
+function h(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (e) {
+    const t = document.createElement("textarea");
+    t.value = text; t.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(t); t.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (_) {}
+    t.remove(); return ok;
+  }
+}
+
+/* ───────── 載入原頁面（藏在看不見的 iframe 裡） ───────── */
+let sourcePromise = null;
+let sourceFrame = null;
+
+function loadSource() {
+  if (sourcePromise) return sourcePromise;
+  sourcePromise = (async () => {
+    const res = await fetch(CONFIG.SOURCE_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("來源頁回應 " + res.status);
+    let html = await res.text();
+    // 拿掉原頁面的流量統計腳本，避免我們的查詢被算進對方的統計
+    html = html.replace(/<script\b[^>]*(?:gc\.zgo\.at|goatcounter)[^>]*>\s*<\/script>/gi, "");
+
+    const f = document.createElement("iframe");
+    f.setAttribute("aria-hidden", "true");
+    f.tabIndex = -1;
+    f.style.cssText = "position:absolute;left:-10000px;top:0;width:1100px;height:800px;border:0;visibility:hidden";
+    f.srcdoc = html;                       // srcdoc 與本頁同源，所以本頁可以操作它
+    sourceFrame = f;
+    document.body.appendChild(f);
+    await new Promise((ok, ng) => { f.onload = ok; setTimeout(() => ng(new Error("來源頁載入逾時")), 25000); });
+
+    const win = f.contentWindow, doc = f.contentDocument;
+    await waitFor(() => doc.getElementById("ck") && doc.getElementById("ckgo") && doc.getElementById("ckres"), 15000);
+
+    // 取得「夥伴專屬」折扣碼清單，之後從結果中移除
+    let aff = new Set();
+    try {
+      win.eval("GROUPS").filter(g => g.id === "aff")
+        .forEach(g => g.items.forEach(i => i.code && aff.add(i.code)));
+    } catch (e) { aff = null; }
+    if (!CONFIG.SHOW_PARTNER_CODES && (!aff || aff.size === 0)) {
+      throw new Error("無法確認夥伴專屬碼清單，為避免外流，已停止顯示結果（原頁面可能改版）");
+    }
+    return { win, doc, aff: aff || new Set() };
+  })().catch(err => {            // 失敗時清掉，下次查詢可重試
+    sourcePromise = null;
+    if (sourceFrame) { sourceFrame.remove(); sourceFrame = null; }
+    throw err;
+  });
+  return sourcePromise;
+}
+
+/* ───────── 解析商品網址／編號 ───────── */
+function extractId(raw) {
+  raw = raw.trim();
+  if (/^\d{1,9}$/.test(raw)) return raw;
+  const m = raw.match(/\/product\/(\d+)/);
+  return m ? m[1] : null;
+}
+function buildLink(raw, id) {
+  let u = null;
+  try {
+    const t = new URL(raw.trim());
+    if (/(^|\.)kkday\.com$/i.test(t.hostname) && /\/product\/\d+/.test(t.pathname)) u = t;
+  } catch (e) {}
+  if (!u) u = new URL("https://www.kkday.com/zh-tw/product/" + id);
+  // 先移除網址裡所有別人的 cid（不分大小寫），再換成你的
+  [...u.searchParams.keys()].forEach(k => { if (k.toLowerCase() === "cid") u.searchParams.delete(k); });
+  u.searchParams.set("cid", CONFIG.CID);
+  u.hash = "";
+  return u.toString();
+}
+
+/* ───────── 查詢＋解析 ───────── */
+async function runQuery(id) {
+  const { doc, win, aff } = await loadSource();
+  const inp = doc.getElementById("ck"), go = doc.getElementById("ckgo"), res = doc.getElementById("ckres");
+  res.innerHTML = "";
+  inp.value = id;
+  inp.dispatchEvent(new win.Event("input", { bubbles: true }));
+  go.click();
+  await waitFor(() => res.children.length > 0, 5000);
+  await sleep(40);
+
+  const out = { info: "", notices: [], groups: [] };
+  for (const el of res.children) {
+    if (el.classList.contains("ckg")) {
+      const kind = el.classList.contains("yes") ? "yes" : el.classList.contains("no") ? "no" : "unk";
+      const rows = [];
+      el.querySelectorAll(".ckrow").forEach(r => {
+        const code = (r.querySelector("code") || {}).textContent;
+        if (!code) return;
+        const c = code.trim();
+        if (!CONFIG.SHOW_PARTNER_CODES && aff.has(c)) return;
+        const sp = r.querySelector("span");
+        let desc = "", till = "";
+        if (sp) {
+          const em = sp.querySelector("em");
+          till = em ? em.textContent.trim() : "";
+          const cl = sp.cloneNode(true);
+          cl.querySelectorAll("em").forEach(e => e.remove());
+          desc = cl.textContent.trim();
+        }
+        rows.push({ code: c, desc, till });
+      });
+      out.groups.push({ kind, rows });
+    } else if (el.classList.contains("hit")) {
+      const b = el.querySelector("b");
+      const title = b ? b.textContent.trim() : "";
+      const body = el.textContent.replace(title, "").trim();
+      out.notices.push({ bad: el.classList.contains("bad"), title, body });
+    } else if (el.classList.contains("ckmore")) {
+      const t = el.textContent.trim();
+      if (el.querySelector("b") && /商品編號/.test(t)) out.info = t;
+      else if (!/信用卡碼的限制/.test(t) && !out.info) out.info = t;
+    }
+  }
+  return out;
+}
+
+/* ───────── 畫面 ───────── */
+const out = $("#out"), btn = $("#go"), qEl = $("#q");
+
+function renderGroup(g, label, open) {
+  const d = h("details", "grp " + g.kind);
+  if (open) d.open = true;
+  const s = h("summary");
+  s.append(h("span", "dot"), document.createTextNode(`${label} · ${g.rows.length} 張`));
+  d.append(s);
+  g.rows.forEach(r => {
+    const row = h("div", "code-row");
+    row.append(h("code", null, r.code));
+    const dd = h("div", "d", r.desc);
+    if (r.till) dd.append(h("em", null, "有效至 " + r.till.replace(/^至\s*/, "")));
+    row.append(dd);
+    if (g.kind !== "no") {
+      const cb = h("button", "copy", "複製");
+      cb.type = "button";
+      cb.onclick = async () => {
+        if (await copyText(r.code)) { cb.textContent = "已複製"; cb.classList.add("done");
+          setTimeout(() => { cb.textContent = "複製"; cb.classList.remove("done"); }, 1400); }
+      };
+      row.append(cb);
+    }
+    d.append(row);
+  });
+  return d;
+}
+
+function render(data, raw, id) {
+  out.replaceChildren();
+  const link = buildLink(raw, id);
+
+  if (data.info) {
+    const p = h("p", "info");
+    const m = data.info.match(/^(商品編號\s*\d+)([：:]?)(.*)$/);
+    if (m) { p.append(h("b", null, m[1]), document.createTextNode(m[2] + m[3])); }
+    else p.textContent = data.info;
+    out.append(p);
+  }
+
+  const cta = h("div", "cta");
+  const a = h("a", "btn primary", "前往商品頁 →");
+  a.href = link; a.target = "_blank"; a.rel = "noopener sponsored";
+  const cp = h("button", "btn", "複製商品連結"); cp.type = "button";
+  cp.onclick = async () => { if (await copyText(link)) { cp.textContent = "已複製連結"; setTimeout(() => cp.textContent = "複製商品連結", 1400); } };
+  cta.append(a, cp);
+  out.append(cta);
+  out.append(h("p", "note", "折扣碼數量有限、用完為止。本工具非官方人員開發，無法保證100%都能使用，若有問題歡迎回報在FB社團，實際折抵請以 KKday 結帳頁為準。"));
+
+  data.notices.forEach(n => {
+    const d = h("div", "notice " + (n.bad ? "bad" : "warn"));
+    if (n.title) d.append(h("b", null, n.title));
+    d.append(document.createTextNode(n.body));
+    out.append(d);
+  });
+
+  const yes = data.groups.find(g => g.kind === "yes");
+  const unk = data.groups.find(g => g.kind === "unk");
+
+  if (yes && yes.rows.length) {
+    if (data.notices.some(n => n.bad)) {
+      out.append(h("div", "notice warn", "這個商品有使用限制，以下為資料標示可用的碼，實際請以結帳頁能否折抵為準。"));
+    }
+    out.append(renderGroup(yes, "確定可以用", true));
+  } else {
+    out.append(h("div", "empty", "目前沒有查到確定可以用的折扣碼。"));
+  }
+  if (unk && unk.rows.length) out.append(renderGroup(unk, "要自己確認", false));
+}
+
+async function search() {
+  const raw = qEl.value;
+  const id = extractId(raw);
+  if (!id) {
+    out.replaceChildren(h("div", "err", "看不出商品編號。請貼上完整的 KKday 商品網址（含 /product/數字），或直接輸入商品編號。"));
+    return;
+  }
+  btn.disabled = true;
+  const loading = h("div", "empty");
+  loading.append(h("span", "spin"), document.createTextNode("查詢中…"));
+  out.replaceChildren(loading);
+  try {
+    const data = await runQuery(id);
+    render(data, raw, id);
+    setStatus("✓ 資料已就緒");
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    setStatus("⚠ " + msg, true);
+    out.replaceChildren(h("div", "err", "查詢失敗：" + msg + "。請稍後再試。"));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("#f").addEventListener("submit", e => { e.preventDefault(); search(); });
+
+// 先在背景把資料載好，第一次查詢會比較快；失敗不打擾，查詢時再重試
+loadSource()
+  .then(() => setStatus("✓ 資料已就緒"))
+  .catch(e => setStatus("⚠ 無法載入資料來源（" + ((e && e.message) || e) + "），按查詢時會再試一次", true));
+
+// 支援 ?u=商品網址 直接帶入並查詢
+const pre = new URLSearchParams(location.search).get("u");
+if (pre) { qEl.value = pre; search(); }
+</script>
+</body>
+</html>
